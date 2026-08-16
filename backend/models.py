@@ -1,41 +1,60 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-
 from database import Base
 
+
+# ============================================================
+# USER
+# ============================================================
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(150), unique=True, nullable=False, index=True)
-    password = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False)
-
-    student = relationship(
-        "Student",
-        back_populates="user",
-        uselist=False
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
     )
 
-    teacher = relationship(
-        "Teacher",
-        back_populates="user",
-        uselist=False
+    name = Column(
+        String(100),
+        nullable=False
     )
 
+    email = Column(
+        String(150),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    password = Column(
+        String(255),
+        nullable=False
+    )
+
+    role = Column(
+        String(20),
+        nullable=False
+    )
+
+
+# ============================================================
+# STUDENT
+# ============================================================
 
 class Student(Base):
     __tablename__ = "students"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=False,
-        unique=True
+        nullable=False
     )
 
     roll_number = Column(
@@ -59,22 +78,24 @@ class Student(Base):
         nullable=False
     )
 
-    user = relationship(
-        "User",
-        back_populates="student"
-    )
 
+# ============================================================
+# TEACHER
+# ============================================================
 
 class Teacher(Base):
     __tablename__ = "teachers"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=False,
-        unique=True
+        nullable=False
     )
 
     employee_id = Column(
@@ -93,17 +114,22 @@ class Teacher(Base):
         nullable=False
     )
 
-    user = relationship(
-        "User",
-        back_populates="teacher"
-    )
+
+# ============================================================
+# COURSE
+# ============================================================
+
 class Course(Base):
     __tablename__ = "courses"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     name = Column(
-        String(150),
+        String(100),
         nullable=False
     )
 
@@ -133,10 +159,20 @@ class Course(Base):
         Integer,
         nullable=False
     )
+
+
+# ============================================================
+# ENROLLMENT
+# ============================================================
+
 class Enrollment(Base):
     __tablename__ = "enrollments"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     student_id = Column(
         Integer,
@@ -147,5 +183,182 @@ class Enrollment(Base):
     course_id = Column(
         Integer,
         ForeignKey("courses.id"),
+        nullable=False
+    )
+
+
+# ============================================================
+# ATTENDANCE
+# ============================================================
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    student_id = Column(
+        Integer,
+        ForeignKey("students.id"),
+        nullable=False
+    )
+
+    course_id = Column(
+        Integer,
+        ForeignKey("courses.id"),
+        nullable=False
+    )
+
+    date = Column(
+        String(20),
+        nullable=False
+    )
+
+    status = Column(
+        String(20),
+        nullable=False
+    )
+# ============================================================
+# ASSIGNMENT
+# ============================================================
+
+class Assignment(Base):
+    __tablename__ = "assignments"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    course_id = Column(
+        Integer,
+        ForeignKey("courses.id"),
+        nullable=False
+    )
+
+    title = Column(
+        String(200),
+        nullable=False
+    )
+
+    description = Column(
+        String(1000),
+        nullable=True
+    )
+
+    due_date = Column(
+        String(30),
+        nullable=False
+    )
+
+    max_marks = Column(
+        Integer,
+        nullable=False
+    )
+
+
+# ============================================================
+# ASSIGNMENT SUBMISSION
+# ============================================================
+
+class AssignmentSubmission(Base):
+    __tablename__ = "assignment_submissions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    assignment_id = Column(
+        Integer,
+        ForeignKey("assignments.id"),
+        nullable=False
+    )
+
+    student_id = Column(
+        Integer,
+        ForeignKey("students.id"),
+        nullable=False
+    )
+
+    submission_date = Column(
+        String(30),
+        nullable=False
+    )
+
+    marks = Column(
+        Integer,
+        nullable=True
+    )
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="submitted"
+    )
+# ============================================================
+# EXAM
+# ============================================================
+
+class Exam(Base):
+    __tablename__ = "exams"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    course_id = Column(
+        Integer,
+        ForeignKey("courses.id"),
+        nullable=False
+    )
+
+    name = Column(
+        String(200),
+        nullable=False
+    )
+
+    exam_type = Column(
+        String(50),
+        nullable=False
+    )
+
+    date = Column(
+        String(30),
+        nullable=False
+    )
+
+    max_marks = Column(
+        Integer,
+        nullable=False
+    )
+
+
+# ============================================================
+# EXAM MARKS
+# ============================================================
+
+class ExamMarks(Base):
+    __tablename__ = "exam_marks"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    exam_id = Column(
+        Integer,
+        ForeignKey("exams.id"),
+        nullable=False
+    )
+
+    student_id = Column(
+        Integer,
+        ForeignKey("students.id"),
+        nullable=False
+    )
+
+    marks = Column(
+        Integer,
         nullable=False
     )
