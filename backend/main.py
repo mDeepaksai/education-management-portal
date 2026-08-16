@@ -1,9 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from database import engine
+from database import engine, Base, get_db
+from schemas import UserCreate
+from models import User
 
 app = FastAPI()
+
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
@@ -20,4 +25,27 @@ def test_database():
         return {"message": "Database connection successful"}
 
     except Exception as e:
-        return {"message": "Database connection failed", "error": str(e)}
+        return {
+            "message": "Database connection failed",
+            "error": str(e)
+        }
+
+
+@app.post("/register")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+
+    new_user = User(
+        name=user.name,
+        email=user.email,
+        password=user.password,
+        role=user.role
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {
+        "message": "User registered successfully",
+        "user_id": new_user.id
+    }
