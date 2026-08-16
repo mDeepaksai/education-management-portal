@@ -97,3 +97,55 @@ class Teacher(Base):
         "User",
         back_populates="teacher"
     )
+class Course(Base):
+    __tablename__ = "courses"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(
+        String(150),
+        nullable=False
+    )
+
+    code = Column(
+        String(50),
+        unique=True,
+        nullable=False
+    )
+
+    description = Column(
+        String(500),
+        nullable=True
+    )
+
+    teacher_id = Column(
+        Integer,
+        ForeignKey("teachers.id"),
+        nullable=False
+    )
+
+    credits = Column(
+        Integer,
+        nullable=False
+    )
+
+    semester = Column(
+        Integer,
+        nullable=False
+    )
+class Enrollment(Base):
+    __tablename__ = "enrollments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    student_id = Column(
+        Integer,
+        ForeignKey("students.id"),
+        nullable=False
+    )
+
+    course_id = Column(
+        Integer,
+        ForeignKey("courses.id"),
+        nullable=False
+    )
