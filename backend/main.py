@@ -1,14 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from database import engine, Base, get_db
-from schemas import UserCreate, UserLogin
+from schemas import UserCreate
 from models import User
 from security import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    get_current_user
 )
 
 
@@ -19,7 +21,6 @@ app = FastAPI(
 )
 
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
 
@@ -59,7 +60,6 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
-    # Check whether email already exists
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
@@ -70,10 +70,8 @@ def register_user(
             detail="Email already registered"
         )
 
-    # Hash password
     hashed_password = hash_password(user.password)
 
-    # Create user
     new_user = User(
         name=user.name,
         email=user.email,
@@ -95,25 +93,23 @@ def register_user(
 
 @app.post("/login")
 def login_user(
-    user: UserLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
 
-    # Find user by email
+    # Swagger sends the email in the username field
     existing_user = db.query(User).filter(
-        User.email == user.email
+        User.email == form_data.username
     ).first()
 
-    # User not found
     if not existing_user:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
-    # Check password
     if not verify_password(
-        user.password,
+        form_data.password,
         existing_user.password
     ):
         raise HTTPException(
@@ -121,14 +117,25 @@ def login_user(
             detail="Invalid email or password"
         )
 
-    # Create JWT token
     access_token = create_access_token({
         "user_id": existing_user.id,
         "role": existing_user.role
     })
 
     return {
-        "message": "Login successful",
         "access_token": access_token,
         "token_type": "bearer"
+    }
+
+
+# ---------------- PROTECTED USER ----------------
+
+@app.get("/me")
+def get_me(
+    current_user: dict = Depends(get_current_user)
+):
+    return {
+        "message": "You are authenticated",
+        "user_id": current_user.get("user_id"),
+        "role": current_user.get("role")
     }
