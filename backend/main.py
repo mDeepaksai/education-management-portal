@@ -48,11 +48,10 @@ from security import (
 from analytics import calculate_risk
 from trend import calculate_trend
 from course_analytics import calculate_course_performance
+
 from recommendations import generate_recommendations
+from ai_service import generate_ai_recommendation
 
-from teacher_analytics import calculate_student_status
-
-from admin_analytics import calculate_admin_status
 
 # ============================================================
 # FASTAPI APPLICATION
@@ -899,10 +898,6 @@ def student_analytics(
             detail="Student profile not found"
         )
 
-    # --------------------------------------------------------
-    # ATTENDANCE
-    # --------------------------------------------------------
-
     attendance_records = db.query(Attendance).filter(
         Attendance.student_id == student.id
     ).all()
@@ -922,10 +917,6 @@ def student_analytics(
     else:
 
         attendance_percentage = 0
-
-    # --------------------------------------------------------
-    # ASSIGNMENTS
-    # --------------------------------------------------------
 
     submissions = db.query(
         AssignmentSubmission
@@ -964,10 +955,6 @@ def student_analytics(
                 len(percentages)
             )
 
-    # --------------------------------------------------------
-    # EXAMS
-    # --------------------------------------------------------
-
     exam_marks = db.query(
         ExamMarks
     ).filter(
@@ -1002,10 +989,6 @@ def student_analytics(
                 len(percentages)
             )
 
-    # --------------------------------------------------------
-    # RISK
-    # --------------------------------------------------------
-
     risk = calculate_risk(
         attendance_percentage,
         assignment_percentage,
@@ -1017,15 +1000,18 @@ def student_analytics(
         "student_id": student.id,
 
         "attendance": round(
-            attendance_percentage, 2
+            attendance_percentage,
+            2
         ),
 
         "assignment_performance": round(
-            assignment_percentage, 2
+            assignment_percentage,
+            2
         ),
 
         "exam_performance": round(
-            exam_percentage, 2
+            exam_percentage,
+            2
         ),
 
         "risk_score": risk["risk_score"],
@@ -1137,20 +1123,12 @@ def student_course_analytics(
     current_user: dict = Depends(get_current_user)
 ):
 
-    # --------------------------------------------------------
-    # CHECK ROLE
-    # --------------------------------------------------------
-
     if current_user.get("role") != "student":
 
         raise HTTPException(
             status_code=403,
             detail="Only students can access course analytics"
         )
-
-    # --------------------------------------------------------
-    # FIND STUDENT
-    # --------------------------------------------------------
 
     student = db.query(Student).filter(
         Student.user_id == current_user.get("user_id")
@@ -1163,19 +1141,11 @@ def student_course_analytics(
             detail="Student profile not found"
         )
 
-    # --------------------------------------------------------
-    # GET ENROLLED COURSES
-    # --------------------------------------------------------
-
     enrollments = db.query(Enrollment).filter(
         Enrollment.student_id == student.id
     ).all()
 
     course_results = []
-
-    # ========================================================
-    # ANALYZE EACH COURSE
-    # ========================================================
 
     for enrollment in enrollments:
 
@@ -1187,10 +1157,6 @@ def student_course_analytics(
             continue
 
         course_id = course.id
-
-        # ----------------------------------------------------
-        # ATTENDANCE FOR THIS COURSE
-        # ----------------------------------------------------
 
         attendance_records = db.query(
             Attendance
@@ -1215,10 +1181,6 @@ def student_course_analytics(
         else:
 
             attendance_percentage = 0
-
-        # ----------------------------------------------------
-        # ASSIGNMENTS FOR THIS COURSE
-        # ----------------------------------------------------
 
         assignments = db.query(
             Assignment
@@ -1265,10 +1227,6 @@ def student_course_analytics(
 
             assignment_percentage = 0
 
-        # ----------------------------------------------------
-        # EXAMS FOR THIS COURSE
-        # ----------------------------------------------------
-
         exams = db.query(Exam).filter(
             Exam.course_id == course_id
         ).all()
@@ -1309,10 +1267,6 @@ def student_course_analytics(
 
             exam_percentage = 0
 
-        # ----------------------------------------------------
-        # CALCULATE COURSE PERFORMANCE
-        # ----------------------------------------------------
-
         performance = calculate_course_performance(
             attendance_percentage,
             assignment_percentage,
@@ -1330,10 +1284,6 @@ def student_course_analytics(
             **performance
 
         })
-
-    # ========================================================
-    # FIND STRONGEST AND WEAKEST COURSE
-    # ========================================================
 
     if course_results:
 
@@ -1360,10 +1310,6 @@ def student_course_analytics(
         strongest_course_name = None
         weakest_course_name = None
 
-    # ========================================================
-    # RESPONSE
-    # ========================================================
-
     return {
 
         "student_id": student.id,
@@ -1380,7 +1326,7 @@ def student_course_analytics(
 
 
 # ============================================================
-# STUDENT PERSONALIZED RECOMMENDATIONS
+# STUDENT RECOMMENDATIONS
 # ============================================================
 
 @app.get("/analytics/student/recommendations")
@@ -1389,20 +1335,12 @@ def student_recommendations(
     current_user: dict = Depends(get_current_user)
 ):
 
-    # --------------------------------------------------------
-    # CHECK ROLE
-    # --------------------------------------------------------
-
     if current_user.get("role") != "student":
 
         raise HTTPException(
             status_code=403,
             detail="Only students can access recommendations"
         )
-
-    # --------------------------------------------------------
-    # FIND STUDENT
-    # --------------------------------------------------------
 
     student = db.query(Student).filter(
         Student.user_id == current_user.get("user_id")
@@ -1415,11 +1353,9 @@ def student_recommendations(
             detail="Student profile not found"
         )
 
-    # ========================================================
-    # ATTENDANCE
-    # ========================================================
-
-    attendance_records = db.query(Attendance).filter(
+    attendance_records = db.query(
+        Attendance
+    ).filter(
         Attendance.student_id == student.id
     ).all()
 
@@ -1432,16 +1368,13 @@ def student_recommendations(
         )
 
         attendance_percentage = (
-            present / len(attendance_records)
+            present /
+            len(attendance_records)
         ) * 100
 
     else:
 
         attendance_percentage = 0
-
-    # ========================================================
-    # ASSIGNMENT PERFORMANCE
-    # ========================================================
 
     submissions = db.query(
         AssignmentSubmission
@@ -1460,10 +1393,7 @@ def student_recommendations(
             Assignment.id == submission.assignment_id
         ).first()
 
-        if (
-            assignment
-            and assignment.max_marks > 0
-        ):
+        if assignment and assignment.max_marks > 0:
 
             percentage = (
                 submission.marks /
@@ -1485,10 +1415,6 @@ def student_recommendations(
 
         assignment_percentage = 0
 
-    # ========================================================
-    # EXAM PERFORMANCE
-    # ========================================================
-
     exam_marks = db.query(
         ExamMarks
     ).filter(
@@ -1505,10 +1431,7 @@ def student_recommendations(
             Exam.id == mark.exam_id
         ).first()
 
-        if (
-            exam
-            and exam.max_marks > 0
-        ):
+        if exam and exam.max_marks > 0:
 
             percentage = (
                 mark.marks /
@@ -1530,63 +1453,11 @@ def student_recommendations(
 
         exam_percentage = 0
 
-    # ========================================================
-    # RISK ANALYSIS
-    # ========================================================
-
     risk = calculate_risk(
         attendance_percentage,
         assignment_percentage,
         exam_percentage
     )
-
-    # ========================================================
-    # TREND ANALYSIS
-    # ========================================================
-
-    scores = []
-
-    for mark in exam_marks:
-
-        exam = db.query(
-            Exam
-        ).filter(
-            Exam.id == mark.exam_id
-        ).first()
-
-        if (
-            exam
-            and exam.max_marks > 0
-        ):
-
-            percentage = (
-                mark.marks /
-                exam.max_marks
-            ) * 100
-
-            scores.append({
-                "date": exam.date,
-                "score": percentage
-            })
-
-    scores.sort(
-        key=lambda x: x["date"]
-    )
-
-    score_values = [
-        item["score"]
-        for item in scores
-    ]
-
-    trend_result = calculate_trend(
-        score_values
-    )
-
-    trend = trend_result["trend"]
-
-    # ========================================================
-    # COURSE ANALYSIS
-    # ========================================================
 
     enrollments = db.query(
         Enrollment
@@ -1598,7 +1469,9 @@ def student_recommendations(
 
     for enrollment in enrollments:
 
-        course = db.query(Course).filter(
+        course = db.query(
+            Course
+        ).filter(
             Course.id == enrollment.course_id
         ).first()
 
@@ -1606,10 +1479,6 @@ def student_recommendations(
             continue
 
         course_id = course.id
-
-        # ----------------------------------------------------
-        # COURSE ATTENDANCE
-        # ----------------------------------------------------
 
         course_attendance = db.query(
             Attendance
@@ -1634,10 +1503,6 @@ def student_recommendations(
         else:
 
             course_attendance_percentage = 0
-
-        # ----------------------------------------------------
-        # COURSE ASSIGNMENTS
-        # ----------------------------------------------------
 
         assignments = db.query(
             Assignment
@@ -1684,15 +1549,11 @@ def student_recommendations(
 
             course_assignment_percentage = 0
 
-        # ----------------------------------------------------
-        # COURSE EXAMS
-        # ----------------------------------------------------
-
         exams = db.query(Exam).filter(
             Exam.course_id == course_id
         ).all()
 
-        course_exam_scores = []
+        exam_scores = []
 
         for exam in exams:
 
@@ -1713,24 +1574,20 @@ def student_recommendations(
                     exam.max_marks
                 ) * 100
 
-                course_exam_scores.append(
+                exam_scores.append(
                     percentage
                 )
 
-        if course_exam_scores:
+        if exam_scores:
 
             course_exam_percentage = (
-                sum(course_exam_scores) /
-                len(course_exam_scores)
+                sum(exam_scores) /
+                len(exam_scores)
             )
 
         else:
 
             course_exam_percentage = 0
-
-        # ----------------------------------------------------
-        # COURSE PERFORMANCE
-        # ----------------------------------------------------
 
         performance = calculate_course_performance(
             course_attendance_percentage,
@@ -1744,14 +1601,11 @@ def student_recommendations(
 
             "course_name": course.name,
 
-            "overall_score":
-                performance["overall_score"]
+            "course_code": course.code,
+
+            **performance
 
         })
-
-    # ========================================================
-    # FIND STRONGEST / WEAKEST COURSE
-    # ========================================================
 
     if course_results:
 
@@ -1778,38 +1632,519 @@ def student_recommendations(
         strongest_course_name = None
         weakest_course_name = None
 
-    # ========================================================
-    # GENERATE RECOMMENDATIONS
-    # ========================================================
+    exam_scores_for_trend = []
+
+    for mark in exam_marks:
+
+        exam = db.query(
+            Exam
+        ).filter(
+            Exam.id == mark.exam_id
+        ).first()
+
+        if exam and exam.max_marks > 0:
+
+            percentage = (
+                mark.marks /
+                exam.max_marks
+            ) * 100
+
+            exam_scores_for_trend.append({
+                "date": exam.date,
+                "score": percentage
+            })
+
+    exam_scores_for_trend.sort(
+        key=lambda x: x["date"]
+    )
+
+    score_values = [
+        item["score"]
+        for item in exam_scores_for_trend
+    ]
+
+    trend_result = calculate_trend(
+        score_values
+    )
 
     result = generate_recommendations(
         attendance=round(
             attendance_percentage,
             2
         ),
-
         assignment_performance=round(
             assignment_percentage,
             2
         ),
-
         exam_performance=round(
             exam_percentage,
             2
         ),
-
+        risk_score=risk["risk_score"],
         risk_level=risk["risk_level"],
-
-        trend=trend,
-
+        reasons=risk["reasons"],
         strongest_course=strongest_course_name,
-
-        weakest_course=weakest_course_name
+        weakest_course=weakest_course_name,
+        trend=trend_result["trend"]
     )
 
-    # ========================================================
+    return {
+
+        "student_id": student.id,
+
+        "attendance": round(
+            attendance_percentage,
+            2
+        ),
+
+        "assignment_performance": round(
+            assignment_percentage,
+            2
+        ),
+
+        "exam_performance": round(
+            exam_percentage,
+            2
+        ),
+
+        "risk_score": risk["risk_score"],
+
+        "risk_level": risk["risk_level"],
+
+        "reasons": risk["reasons"],
+
+        "strongest_course":
+            strongest_course_name,
+
+        "weakest_course":
+            weakest_course_name,
+
+        "trend":
+            trend_result["trend"],
+
+        "recommendations":
+            result
+
+    }
+
+
+# ============================================================
+# AI STUDENT RECOMMENDATION
+# ============================================================
+
+@app.get("/ai/student/recommendation")
+def ai_student_recommendation(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+
+    if current_user.get("role") != "student":
+
+        raise HTTPException(
+            status_code=403,
+            detail="Only students can access AI recommendations"
+        )
+
+    student = db.query(Student).filter(
+        Student.user_id == current_user.get("user_id")
+    ).first()
+
+    if not student:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Student profile not found"
+        )
+
+    # --------------------------------------------------------
+    # ATTENDANCE
+    # --------------------------------------------------------
+
+    attendance_records = db.query(
+        Attendance
+    ).filter(
+        Attendance.student_id == student.id
+    ).all()
+
+    if attendance_records:
+
+        present = sum(
+            1
+            for record in attendance_records
+            if record.status.lower() == "present"
+        )
+
+        attendance_percentage = (
+            present /
+            len(attendance_records)
+        ) * 100
+
+    else:
+
+        attendance_percentage = 0
+
+    # --------------------------------------------------------
+    # ASSIGNMENTS
+    # --------------------------------------------------------
+
+    submissions = db.query(
+        AssignmentSubmission
+    ).filter(
+        AssignmentSubmission.student_id == student.id,
+        AssignmentSubmission.marks.isnot(None)
+    ).all()
+
+    assignment_percentages = []
+
+    for submission in submissions:
+
+        assignment = db.query(
+            Assignment
+        ).filter(
+            Assignment.id == submission.assignment_id
+        ).first()
+
+        if assignment and assignment.max_marks > 0:
+
+            percentage = (
+                submission.marks /
+                assignment.max_marks
+            ) * 100
+
+            assignment_percentages.append(
+                percentage
+            )
+
+    if assignment_percentages:
+
+        assignment_percentage = (
+            sum(assignment_percentages) /
+            len(assignment_percentages)
+        )
+
+    else:
+
+        assignment_percentage = 0
+
+    # --------------------------------------------------------
+    # EXAMS
+    # --------------------------------------------------------
+
+    exam_marks = db.query(
+        ExamMarks
+    ).filter(
+        ExamMarks.student_id == student.id
+    ).all()
+
+    exam_percentages = []
+
+    for mark in exam_marks:
+
+        exam = db.query(
+            Exam
+        ).filter(
+            Exam.id == mark.exam_id
+        ).first()
+
+        if exam and exam.max_marks > 0:
+
+            percentage = (
+                mark.marks /
+                exam.max_marks
+            ) * 100
+
+            exam_percentages.append(
+                percentage
+            )
+
+    if exam_percentages:
+
+        exam_percentage = (
+            sum(exam_percentages) /
+            len(exam_percentages)
+        )
+
+    else:
+
+        exam_percentage = 0
+
+    # --------------------------------------------------------
+    # RISK
+    # --------------------------------------------------------
+
+    risk = calculate_risk(
+        attendance_percentage,
+        assignment_percentage,
+        exam_percentage
+    )
+
+    # --------------------------------------------------------
+    # COURSE ANALYTICS
+    # --------------------------------------------------------
+
+    enrollments = db.query(
+        Enrollment
+    ).filter(
+        Enrollment.student_id == student.id
+    ).all()
+
+    course_results = []
+
+    for enrollment in enrollments:
+
+        course = db.query(
+            Course
+        ).filter(
+            Course.id == enrollment.course_id
+        ).first()
+
+        if not course:
+            continue
+
+        course_id = course.id
+
+        # Course attendance
+
+        course_attendance = db.query(
+            Attendance
+        ).filter(
+            Attendance.student_id == student.id,
+            Attendance.course_id == course_id
+        ).all()
+
+        if course_attendance:
+
+            present = sum(
+                1
+                for record in course_attendance
+                if record.status.lower() == "present"
+            )
+
+            course_attendance_percentage = (
+                present /
+                len(course_attendance)
+            ) * 100
+
+        else:
+
+            course_attendance_percentage = 0
+
+        # Course assignments
+
+        assignments = db.query(
+            Assignment
+        ).filter(
+            Assignment.course_id == course_id
+        ).all()
+
+        assignment_scores = []
+
+        for assignment in assignments:
+
+            submission = db.query(
+                AssignmentSubmission
+            ).filter(
+                AssignmentSubmission.assignment_id ==
+                assignment.id,
+                AssignmentSubmission.student_id ==
+                student.id
+            ).first()
+
+            if (
+                submission
+                and submission.marks is not None
+                and assignment.max_marks > 0
+            ):
+
+                percentage = (
+                    submission.marks /
+                    assignment.max_marks
+                ) * 100
+
+                assignment_scores.append(
+                    percentage
+                )
+
+        if assignment_scores:
+
+            course_assignment_percentage = (
+                sum(assignment_scores) /
+                len(assignment_scores)
+            )
+
+        else:
+
+            course_assignment_percentage = 0
+
+        # Course exams
+
+        exams = db.query(Exam).filter(
+            Exam.course_id == course_id
+        ).all()
+
+        exam_scores = []
+
+        for exam in exams:
+
+            marks = db.query(
+                ExamMarks
+            ).filter(
+                ExamMarks.exam_id == exam.id,
+                ExamMarks.student_id == student.id
+            ).first()
+
+            if (
+                marks
+                and exam.max_marks > 0
+            ):
+
+                percentage = (
+                    marks.marks /
+                    exam.max_marks
+                ) * 100
+
+                exam_scores.append(
+                    percentage
+                )
+
+        if exam_scores:
+
+            course_exam_percentage = (
+                sum(exam_scores) /
+                len(exam_scores)
+            )
+
+        else:
+
+            course_exam_percentage = 0
+
+        performance = calculate_course_performance(
+            course_attendance_percentage,
+            course_assignment_percentage,
+            course_exam_percentage
+        )
+
+        course_results.append({
+
+            "course_id": course.id,
+
+            "course_name": course.name,
+
+            "course_code": course.code,
+
+            **performance
+
+        })
+
+    if course_results:
+
+        strongest_course = max(
+            course_results,
+            key=lambda x: x["overall_score"]
+        )
+
+        weakest_course = min(
+            course_results,
+            key=lambda x: x["overall_score"]
+        )
+
+        strongest_course_name = (
+            strongest_course["course_name"]
+        )
+
+        weakest_course_name = (
+            weakest_course["course_name"]
+        )
+
+    else:
+
+        strongest_course_name = None
+        weakest_course_name = None
+
+    # --------------------------------------------------------
+    # TREND
+    # --------------------------------------------------------
+
+    exam_scores_for_trend = []
+
+    for mark in exam_marks:
+
+        exam = db.query(
+            Exam
+        ).filter(
+            Exam.id == mark.exam_id
+        ).first()
+
+        if exam and exam.max_marks > 0:
+
+            percentage = (
+                mark.marks /
+                exam.max_marks
+            ) * 100
+
+            exam_scores_for_trend.append({
+                "date": exam.date,
+                "score": percentage
+            })
+
+    exam_scores_for_trend.sort(
+        key=lambda x: x["date"]
+    )
+
+    score_values = [
+        item["score"]
+        for item in exam_scores_for_trend
+    ]
+
+    trend_result = calculate_trend(
+        score_values
+    )
+
+    # --------------------------------------------------------
+    # GEMINI AI
+    # --------------------------------------------------------
+
+    try:
+
+        ai_result = generate_ai_recommendation(
+            attendance=round(
+                attendance_percentage,
+                2
+            ),
+
+            assignment_performance=round(
+                assignment_percentage,
+                2
+            ),
+
+            exam_performance=round(
+                exam_percentage,
+                2
+            ),
+
+            risk_score=risk["risk_score"],
+
+            risk_level=risk["risk_level"],
+
+            reasons=risk["reasons"],
+
+            strongest_course=strongest_course_name,
+
+            weakest_course=weakest_course_name,
+
+            trend=trend_result["trend"]
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI recommendation failed: {str(e)}"
+        )
+
+    # --------------------------------------------------------
     # RESPONSE
-    # ========================================================
+    # --------------------------------------------------------
 
     return {
 
@@ -1836,655 +2171,31 @@ def student_recommendations(
 
         "risk": {
 
-            "score": risk["risk_score"],
+            "risk_score":
+                risk["risk_score"],
 
-            "level": risk["risk_level"],
+            "risk_level":
+                risk["risk_level"],
 
-            "reasons": risk["reasons"]
+            "reasons":
+                risk["reasons"]
 
         },
 
-        "trend": trend,
+        "course_analysis": {
 
-        "strongest_course":
-            strongest_course_name,
+            "strongest_course":
+                strongest_course_name,
 
-        "weakest_course":
-            weakest_course_name,
+            "weakest_course":
+                weakest_course_name
 
-        "recommendations":
-            result["recommendations"]
+        },
 
-    }
-@app.get("/analytics/teacher/course/{course_id}")
-def teacher_course_analytics(
-    course_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+        "trend":
+            trend_result["trend"],
 
-    if current_user.get("role") != "teacher":
-        raise HTTPException(
-            status_code=403,
-            detail="Only teachers can access course analytics"
-        )
+        "ai_recommendation":
+            ai_result
 
-    teacher = db.query(Teacher).filter(
-        Teacher.user_id == current_user.get("user_id")
-    ).first()
-
-    if not teacher:
-        raise HTTPException(
-            status_code=404,
-            detail="Teacher profile not found"
-        )
-
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.teacher_id == teacher.id
-    ).first()
-
-    if not course:
-        raise HTTPException(
-            status_code=404,
-            detail="Course not found or you do not teach this course"
-        )
-
-    enrollments = db.query(Enrollment).filter(
-        Enrollment.course_id == course_id
-    ).all()
-
-    students = []
-
-    for enrollment in enrollments:
-
-        student = db.query(Student).filter(
-            Student.id == enrollment.student_id
-        ).first()
-
-        if not student:
-            continue
-
-        user = db.query(User).filter(
-            User.id == student.user_id
-        ).first()
-
-        # -----------------------------
-        # ATTENDANCE
-        # -----------------------------
-
-        attendance_records = db.query(Attendance).filter(
-            Attendance.student_id == student.id,
-            Attendance.course_id == course_id
-        ).all()
-
-        if attendance_records:
-
-            present = sum(
-                1
-                for record in attendance_records
-                if record.status.lower() == "present"
-            )
-
-            attendance = (
-                present / len(attendance_records)
-            ) * 100
-
-        else:
-            attendance = 0
-
-        # -----------------------------
-        # ASSIGNMENTS
-        # -----------------------------
-
-        assignments = db.query(Assignment).filter(
-            Assignment.course_id == course_id
-        ).all()
-
-        assignment_scores = []
-
-        for assignment in assignments:
-
-            submission = db.query(
-                AssignmentSubmission
-            ).filter(
-                AssignmentSubmission.assignment_id == assignment.id,
-                AssignmentSubmission.student_id == student.id
-            ).first()
-
-            if (
-                submission
-                and submission.marks is not None
-                and assignment.max_marks > 0
-            ):
-
-                percentage = (
-                    submission.marks /
-                    assignment.max_marks
-                ) * 100
-
-                assignment_scores.append(percentage)
-
-        if assignment_scores:
-            assignment_performance = (
-                sum(assignment_scores) /
-                len(assignment_scores)
-            )
-        else:
-            assignment_performance = 0
-
-        # -----------------------------
-        # EXAMS
-        # -----------------------------
-
-        exams = db.query(Exam).filter(
-            Exam.course_id == course_id
-        ).all()
-
-        exam_scores = []
-
-        for exam in exams:
-
-            marks = db.query(ExamMarks).filter(
-                ExamMarks.exam_id == exam.id,
-                ExamMarks.student_id == student.id
-            ).first()
-
-            if (
-                marks
-                and exam.max_marks > 0
-            ):
-
-                percentage = (
-                    marks.marks /
-                    exam.max_marks
-                ) * 100
-
-                exam_scores.append(percentage)
-
-        if exam_scores:
-            exam_performance = (
-                sum(exam_scores) /
-                len(exam_scores)
-            )
-        else:
-            exam_performance = 0
-
-        # -----------------------------
-        # PERFORMANCE
-        # -----------------------------
-
-        performance = calculate_student_status(
-            attendance,
-            assignment_performance,
-            exam_performance
-        )
-
-        students.append({
-
-            "student_id": student.id,
-
-            "student_name": (
-                user.name if user else None
-            ),
-
-            "roll_number": student.roll_number,
-
-            "attendance": round(
-                attendance, 2
-            ),
-
-            "assignment_performance": round(
-                assignment_performance, 2
-            ),
-
-            "exam_performance": round(
-                exam_performance, 2
-            ),
-
-            "overall_score": performance[
-                "overall_score"
-            ],
-
-            "status": performance[
-                "status"
-            ]
-        })
-
-    # -----------------------------
-    # COURSE SUMMARY
-    # -----------------------------
-
-    if students:
-
-        class_average = (
-            sum(
-                student["overall_score"]
-                for student in students
-            )
-            / len(students)
-        )
-
-        needs_improvement = [
-            student
-            for student in students
-            if student["status"] == "NEEDS_IMPROVEMENT"
-        ]
-
-        best_student = max(
-            students,
-            key=lambda x: x["overall_score"]
-        )
-
-    else:
-
-        class_average = 0
-        needs_improvement = []
-        best_student = None
-
-    return {
-
-        "course_id": course.id,
-
-        "course_name": course.name,
-
-        "course_code": course.code,
-
-        "total_students": len(students),
-
-        "class_average": round(
-            class_average, 2
-        ),
-
-        "best_student": best_student,
-
-        "students_needing_improvement": (
-            needs_improvement
-        ),
-
-        "students": students
-    }
-@app.get("/analytics/admin/overview")
-def admin_analytics(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-
-    # --------------------------------------------------------
-    # CHECK ADMIN
-    # --------------------------------------------------------
-
-    if current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only admins can access admin analytics"
-        )
-
-    # --------------------------------------------------------
-    # BASIC COUNTS
-    # --------------------------------------------------------
-
-    total_students = db.query(Student).count()
-
-    total_teachers = db.query(Teacher).count()
-
-    total_courses = db.query(Course).count()
-
-    total_assignments = db.query(Assignment).count()
-
-    total_exams = db.query(Exam).count()
-
-    # --------------------------------------------------------
-    # ATTENDANCE ANALYTICS
-    # --------------------------------------------------------
-
-    attendance_records = db.query(Attendance).all()
-
-    if attendance_records:
-
-        present_count = sum(
-            1
-            for record in attendance_records
-            if record.status.lower() == "present"
-        )
-
-        attendance_percentage = (
-            present_count /
-            len(attendance_records)
-        ) * 100
-
-    else:
-
-        attendance_percentage = 0
-
-    # --------------------------------------------------------
-    # ASSIGNMENT ANALYTICS
-    # --------------------------------------------------------
-
-    submissions = db.query(
-        AssignmentSubmission
-    ).filter(
-        AssignmentSubmission.marks.isnot(None)
-    ).all()
-
-    assignment_scores = []
-
-    for submission in submissions:
-
-        assignment = db.query(
-            Assignment
-        ).filter(
-            Assignment.id == submission.assignment_id
-        ).first()
-
-        if (
-            assignment
-            and assignment.max_marks > 0
-        ):
-
-            percentage = (
-                submission.marks /
-                assignment.max_marks
-            ) * 100
-
-            assignment_scores.append(
-                percentage
-            )
-
-    if assignment_scores:
-
-        assignment_average = (
-            sum(assignment_scores) /
-            len(assignment_scores)
-        )
-
-    else:
-
-        assignment_average = 0
-
-    # --------------------------------------------------------
-    # EXAM ANALYTICS
-    # --------------------------------------------------------
-
-    exam_marks = db.query(
-        ExamMarks
-    ).all()
-
-    exam_scores = []
-
-    for mark in exam_marks:
-
-        exam = db.query(
-            Exam
-        ).filter(
-            Exam.id == mark.exam_id
-        ).first()
-
-        if (
-            exam
-            and exam.max_marks > 0
-        ):
-
-            percentage = (
-                mark.marks /
-                exam.max_marks
-            ) * 100
-
-            exam_scores.append(
-                percentage
-            )
-
-    if exam_scores:
-
-        exam_average = (
-            sum(exam_scores) /
-            len(exam_scores)
-        )
-
-    else:
-
-        exam_average = 0
-
-    # --------------------------------------------------------
-    # OVERALL ACADEMIC SCORE
-    # --------------------------------------------------------
-
-    overall_score = (
-        attendance_percentage * 0.20
-        + assignment_average * 0.30
-        + exam_average * 0.50
-    )
-
-    overall_score = round(
-        overall_score,
-        2
-    )
-
-    status = calculate_admin_status(
-        overall_score
-    )
-
-    # --------------------------------------------------------
-    # COURSE PERFORMANCE
-    # --------------------------------------------------------
-
-    course_results = []
-
-    courses = db.query(Course).all()
-
-    for course in courses:
-
-        # Attendance
-
-        course_attendance = db.query(
-            Attendance
-        ).filter(
-            Attendance.course_id == course.id
-        ).all()
-
-        if course_attendance:
-
-            present = sum(
-                1
-                for record in course_attendance
-                if record.status.lower() == "present"
-            )
-
-            course_attendance_percentage = (
-                present /
-                len(course_attendance)
-            ) * 100
-
-        else:
-
-            course_attendance_percentage = 0
-
-        # Assignments
-
-        course_assignments = db.query(
-            Assignment
-        ).filter(
-            Assignment.course_id == course.id
-        ).all()
-
-        course_assignment_scores = []
-
-        for assignment in course_assignments:
-
-            course_submissions = db.query(
-                AssignmentSubmission
-            ).filter(
-                AssignmentSubmission.assignment_id ==
-                assignment.id,
-                AssignmentSubmission.marks.isnot(None)
-            ).all()
-
-            for submission in course_submissions:
-
-                if assignment.max_marks > 0:
-
-                    percentage = (
-                        submission.marks /
-                        assignment.max_marks
-                    ) * 100
-
-                    course_assignment_scores.append(
-                        percentage
-                    )
-
-        if course_assignment_scores:
-
-            course_assignment_average = (
-                sum(course_assignment_scores) /
-                len(course_assignment_scores)
-            )
-
-        else:
-
-            course_assignment_average = 0
-
-        # Exams
-
-        course_exams = db.query(
-            Exam
-        ).filter(
-            Exam.course_id == course.id
-        ).all()
-
-        course_exam_scores = []
-
-        for exam in course_exams:
-
-            marks = db.query(
-                ExamMarks
-            ).filter(
-                ExamMarks.exam_id == exam.id
-            ).all()
-
-            for mark in marks:
-
-                if exam.max_marks > 0:
-
-                    percentage = (
-                        mark.marks /
-                        exam.max_marks
-                    ) * 100
-
-                    course_exam_scores.append(
-                        percentage
-                    )
-
-        if course_exam_scores:
-
-            course_exam_average = (
-                sum(course_exam_scores) /
-                len(course_exam_scores)
-            )
-
-        else:
-
-            course_exam_average = 0
-
-        # Overall course score
-
-        course_score = (
-            course_attendance_percentage * 0.20
-            + course_assignment_average * 0.30
-            + course_exam_average * 0.50
-        )
-
-        course_results.append({
-
-            "course_id": course.id,
-
-            "course_name": course.name,
-
-            "course_code": course.code,
-
-            "attendance": round(
-                course_attendance_percentage,
-                2
-            ),
-
-            "assignment_performance": round(
-                course_assignment_average,
-                2
-            ),
-
-            "exam_performance": round(
-                course_exam_average,
-                2
-            ),
-
-            "overall_score": round(
-                course_score,
-                2
-            ),
-
-            "status": calculate_admin_status(
-                course_score
-            )
-        })
-
-    # --------------------------------------------------------
-    # BEST AND WEAKEST COURSE
-    # --------------------------------------------------------
-
-    if course_results:
-
-        best_course = max(
-            course_results,
-            key=lambda x: x["overall_score"]
-        )
-
-        weakest_course = min(
-            course_results,
-            key=lambda x: x["overall_score"]
-        )
-
-    else:
-
-        best_course = None
-        weakest_course = None
-
-    # --------------------------------------------------------
-    # RESPONSE
-    # --------------------------------------------------------
-
-    return {
-
-        "total_students": total_students,
-
-        "total_teachers": total_teachers,
-
-        "total_courses": total_courses,
-
-        "total_assignments": total_assignments,
-
-        "total_exams": total_exams,
-
-        "average_attendance": round(
-            attendance_percentage,
-            2
-        ),
-
-        "average_assignment_performance": round(
-            assignment_average,
-            2
-        ),
-
-        "average_exam_performance": round(
-            exam_average,
-            2
-        ),
-
-        "overall_academic_score": overall_score,
-
-        "overall_status": status,
-
-        "best_course": best_course,
-
-        "weakest_course": weakest_course,
-
-        "courses": course_results
     }
